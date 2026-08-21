@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97a3680418a06504db767cd92232f1b4, type: 3}
+  m_Name: SwordAndShieldData
+  m_EditorClassIdentifier: Assembly-CSharp::ActionRPG.Combat.WeaponData
+  WeaponName: Sword & Shield
+  WeaponType: 1
+  ComboChain:
+  - StepName: Shield Bash 1
+    BaseDamage: 20
+    WindupDuration: 0.06
+    ActiveDuration: 0.12
+    RecoveryDuration: 0.08
+    SwingDuration: 0.26
+    ComboWindowDuration: 0.45
+    MoveSpeedMultiplier: 0.75
+    KnockbackForce: 6
+    HitStunDuration: 0.25
+    HitboxRadius: 1.3
+    HitboxOffset: {x: 0, y: 0, z: 1.1}
+    DebugColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+    SwingArcAngle: 80
+  - StepName: Sword Slash 2
+    BaseDamage: 28
+    WindupDuration: 0.05
+    ActiveDuration: 0.12
+    RecoveryDuration: 0.08
+    SwingDuration: 0.25
+    ComboWindowDuration: 0.45
+    MoveSpeedMultiplier: 0.75
+    KnockbackForce: 5
+    HitStunDuration: 0.22
+    HitboxRadius: 1.4
+    HitboxOffset: {x: 0, y: 0, z: 1.3}
+    DebugColor: {r: 0, g: 1, b: 1, a: 1}
+    SwingArcAngle: 110
+  - StepName: Cleave Finisher 3
+    BaseDamage: 50
+    WindupDuration: 0.1
+    ActiveDuration: 0.2
+    RecoveryDuration: 0.15
+    SwingDuration: 0.45
+    ComboWindowDuration: 0.55
+    MoveSpeedMultiplier: 0.5
+    KnockbackForce: 10
+    HitStunDuration: 0.4
+    HitboxRadius: 1.8
+    HitboxOffset: {x: 0, y: 0, z: 1.5}
+    DebugColor: {r: 1, g: 0, b: 0, a: 1}
+    SwingArcAngle: 160
+  CanBlock: 1
+  MaxBlockDurability: 100
+  BlockDamageReduction: 1
+  BlockRegenDelay: 1.5
+  BlockRegenRate: 30
+  GuardBreakThreshold: 0
+  GuardRecoveryThreshold: 35
+  BlockMoveSpeedMultiplier: 0.6
+  GuardBreakStaggerDuration: 0.8
+  GuardBreakMoveSpeedMultiplier: 0.2
+  ExcessDamageMultiplier: 1
+
+
