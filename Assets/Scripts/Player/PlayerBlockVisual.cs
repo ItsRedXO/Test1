@@ -7,36 +7,70 @@ namespace ActionRPG.Player
     {
         [Header("Visual Settings")]
         [SerializeField] private float radius = 1.6f;
+        [SerializeField] private float blockAngle = 140f;
         [SerializeField] private float height = 0.08f;
         [SerializeField] private float lineWidth = 0.12f;
         [SerializeField] private int segments = 24;
         [SerializeField] private Color blockColor = new Color(0.1f, 0.75f, 1f, 0.8f);
 
         private LineRenderer lineRenderer;
-        private float blockAngle = 140f;
+        private PlayerBlockSystem blockSystem;
+        private PlayerController playerController;
         private Vector3[] points;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void CreateVisualsForPlayers()
+        {
+            PlayerBlockSystem[] blockSystems = Object.FindObjectsByType<PlayerBlockSystem>(FindObjectsSortMode.None);
+
+            foreach (PlayerBlockSystem system in blockSystems)
+            {
+                if (system.GetComponentInChildren<PlayerBlockVisual>(true) != null)
+                {
+                    continue;
+                }
+
+                GameObject visualObject = new GameObject("BlockVisual");
+                visualObject.transform.SetParent(system.transform, false);
+                visualObject.AddComponent<PlayerBlockVisual>();
+            }
+        }
 
         private void Awake()
         {
+            blockSystem = GetComponentInParent<PlayerBlockSystem>();
+            playerController = blockSystem != null ? blockSystem.GetComponent<PlayerController>() : null;
             EnsureRenderer();
-            gameObject.SetActive(false);
+            lineRenderer.enabled = false;
         }
 
-        public void Initialize(float angle)
+        private void Update()
         {
-            blockAngle = Mathf.Clamp(angle, 1f, 360f);
-            EnsureRenderer();
-            gameObject.SetActive(false);
+            if (blockSystem == null)
+            {
+                blockSystem = GetComponentInParent<PlayerBlockSystem>();
+                if (blockSystem == null)
+                {
+                    return;
+                }
+            }
+
+            if (playerController == null)
+            {
+                playerController = blockSystem.GetComponent<PlayerController>();
+            }
+
+            Vector3 forward = playerController != null
+                ? playerController.CurrentFacingDirection
+                : blockSystem.transform.forward;
+
+            SetVisible(blockSystem.IsBlocking, blockSystem.transform.position, forward);
         }
 
         public void SetVisible(bool visible, Vector3 origin, Vector3 forward)
         {
             EnsureRenderer();
-
-            if (gameObject.activeSelf != visible)
-            {
-                gameObject.SetActive(visible);
-            }
+            lineRenderer.enabled = visible;
 
             if (!visible)
             {
