@@ -253,10 +253,12 @@ namespace ActionRPG.Enemy
         private void FireProjectile()
         {
             Transform origin = projectileSpawnPoint != null ? projectileSpawnPoint : transform;
-            Vector3 direction = playerTarget.position - origin.position;
+            Vector3 spawnPosition = EnemyProjectile.GetLaunchPosition(origin.position);
+            Vector3 targetPoint = EnemyProjectile.GetAimPoint(playerTarget.position);
+            Vector3 direction = targetPoint - spawnPosition;
             if (direction.sqrMagnitude < 0.001f) return;
 
-            EnemyProjectile projectile = Instantiate(projectilePrefab, origin.position, Quaternion.LookRotation(direction.normalized));
+            EnemyProjectile projectile = Instantiate(projectilePrefab, spawnPosition, Quaternion.LookRotation(direction.normalized));
             projectile.Initialize(
                 gameObject,
                 Faction.Enemy,
