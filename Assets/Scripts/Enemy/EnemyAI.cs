@@ -40,6 +40,7 @@ namespace ActionRPG.Enemy
         private NavMeshAgent agent;
         private Health health;
         private Transform playerTarget;
+        private Health playerHealth;
         private Color originalColor;
         private float attackCooldownTimer;
         private Coroutine hitStunCoroutine;
@@ -90,6 +91,12 @@ namespace ActionRPG.Enemy
                 if (playerTarget == null) return;
             }
 
+            if (playerHealth == null || !playerHealth.IsAlive)
+            {
+                StopAttackingUnavailablePlayer();
+                return;
+            }
+
             if (attackCooldownTimer > 0f)
             {
                 attackCooldownTimer -= Time.deltaTime;
@@ -135,11 +142,34 @@ namespace ActionRPG.Enemy
             if (playerObj != null)
             {
                 playerTarget = playerObj.transform;
+                playerHealth = playerObj.GetComponent<Health>();
+            }
+        }
+
+        private void StopAttackingUnavailablePlayer()
+        {
+            if (attackCoroutine != null)
+            {
+                StopCoroutine(attackCoroutine);
+                attackCoroutine = null;
+            }
+
+            if (agent.enabled && !agent.isStopped)
+            {
+                agent.isStopped = true;
+            }
+
+            if (CurrentState != EnemyState.Idle)
+            {
+                CurrentState = EnemyState.Idle;
+                SetColor(originalColor);
             }
         }
 
         private IEnumerator PerformAttackRoutine()
         {
+            if (playerHealth == null || !playerHealth.IsAlive) yield break;
+
             CurrentState = EnemyState.AttackWindup;
             agent.isStopped = true;
 
@@ -152,7 +182,7 @@ namespace ActionRPG.Enemy
             SetColor(Color.yellow);
             yield return new WaitForSeconds(attackWindupTime);
 
-            if (CurrentState == EnemyState.HitStun || CurrentState == EnemyState.Dead) yield break;
+            if (CurrentState == EnemyState.HitStun || CurrentState == EnemyState.Dead || playerHealth == null || !playerHealth.IsAlive) yield break;
 
             // Execute Attack
             CurrentState = EnemyState.Attacking;
@@ -274,4 +304,3 @@ namespace ActionRPG.Enemy
         }
     }
 }
-

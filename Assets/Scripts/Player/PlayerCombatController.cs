@@ -13,6 +13,7 @@ namespace ActionRPG.Player
         [SerializeField] private WeaponHandler weaponHandler;
 
         public bool IsAttacking { get; private set; }
+        public bool CanAttack { get; private set; } = true;
         public int CurrentComboIndex { get; private set; }
 
         public event Action<int, ComboStep> OnAttackStarted;
@@ -31,6 +32,7 @@ namespace ActionRPG.Player
 
         private void Update()
         {
+            if (!CanAttack) return;
             if (InputHandler.Instance == null || weaponHandler == null || weaponHandler.CurrentWeaponData == null) return;
 
             // Attack input check
@@ -142,6 +144,19 @@ namespace ActionRPG.Player
             if (weaponHandler != null) weaponHandler.StopHitbox();
             OnComboReset?.Invoke();
         }
+
+        public void SetCombatEnabled(bool enabled)
+        {
+            CanAttack = enabled;
+            if (enabled) return;
+
+            if (attackCoroutine != null)
+            {
+                StopCoroutine(attackCoroutine);
+                attackCoroutine = null;
+            }
+
+            ResetCombo();
+        }
     }
 }
-

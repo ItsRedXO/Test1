@@ -14,6 +14,7 @@ namespace ActionRPG.Input
         public bool BlockHeld { get; private set; }
         public bool Weapon1Pressed { get; private set; }
         public bool Weapon2Pressed { get; private set; }
+        public bool GameplayInputEnabled { get; private set; } = true;
 
         private void Awake()
         {
@@ -27,6 +28,12 @@ namespace ActionRPG.Input
 
         private void Update()
         {
+            if (!GameplayInputEnabled)
+            {
+                ClearGameplayInput();
+                return;
+            }
+
             // Read Movement (WASD / Arrow Keys)
             Vector2 move = Vector2.zero;
             if (Keyboard.current != null)
@@ -55,6 +62,22 @@ namespace ActionRPG.Input
                 AttackHeld = false;
                 BlockHeld = false;
             }
+        }
+
+        public void SetGameplayInputEnabled(bool enabled)
+        {
+            GameplayInputEnabled = enabled;
+            if (!enabled) ClearGameplayInput();
+        }
+
+        private void ClearGameplayInput()
+        {
+            MoveInput = Vector2.zero;
+            AttackPressed = false;
+            AttackHeld = false;
+            BlockHeld = false;
+            Weapon1Pressed = false;
+            Weapon2Pressed = false;
         }
     }
 }

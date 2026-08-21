@@ -19,6 +19,7 @@ namespace ActionRPG.Player
         public float CurrentBlockDurability { get; private set; }
         public float MaxBlockDurability { get; private set; } = 100f;
         public bool IsBlocking { get; private set; }
+        public bool BlockingEnabled { get; private set; } = true;
         public bool IsGuardBroken { get; private set; }
         public bool IsStaggered { get; private set; }
 
@@ -95,6 +96,12 @@ namespace ActionRPG.Player
         private void Update()
         {
             bool wantsBlock = InputHandler.Instance != null && InputHandler.Instance.BlockHeld;
+            if (!BlockingEnabled)
+            {
+                wasBlockHeld = false;
+                return;
+            }
+
             if (wantsBlock && !wasBlockHeld)
             {
                 weaponSwitcher?.TryEquipBlockingWeapon();
@@ -168,7 +175,7 @@ namespace ActionRPG.Player
             if (weaponHandler == null || weaponHandler.CurrentWeaponData == null) return rawDamage;
             WeaponData weaponData = weaponHandler.CurrentWeaponData;
 
-            if (!weaponData.CanBlock || !IsBlocking || IsGuardBroken || !rawDamage.IsBlockable)
+            if (!BlockingEnabled || !weaponData.CanBlock || !IsBlocking || IsGuardBroken || !rawDamage.IsBlockable)
             {
                 return rawDamage;
             }
@@ -241,6 +248,24 @@ namespace ActionRPG.Player
 
             if (staggerCoroutine != null) StopCoroutine(staggerCoroutine);
             staggerCoroutine = StartCoroutine(PerformGuardBreakStagger(weaponData));
+        }
+
+        public void SetBlockingEnabled(bool enabled)
+        {
+            BlockingEnabled = enabled;
+            if (enabled) return;
+
+            wasBlockHeld = false;
+            IsBlocking = false;
+
+            if (staggerCoroutine != null)
+            {
+                StopCoroutine(staggerCoroutine);
+                staggerCoroutine = null;
+            }
+
+            IsStaggered = false;
+            NotifyStateChanged();
         }
 
         private IEnumerator PerformGuardBreakStagger(WeaponData weaponData)

@@ -19,6 +19,7 @@ namespace ActionRPG.Player
         private float verticalVelocity;
 
         public float MoveSpeedMultiplier { get; set; } = 1f;
+        public bool CanMove { get; set; } = true;
         public bool CanRotate { get; set; } = true;
         public Vector3 CurrentFacingDirection { get; private set; } = Vector3.forward;
         public Vector3 LastMoveVector { get; private set; }
@@ -39,6 +40,7 @@ namespace ActionRPG.Player
 
         private void Update()
         {
+            if (!CanMove) return;
             if (InputHandler.Instance == null) return;
 
             HandleMovement();
@@ -106,6 +108,14 @@ namespace ActionRPG.Player
                 }
             }
         }
+
+        public void Teleport(Vector3 position, Quaternion rotation)
+        {
+            bool controllerWasEnabled = characterController.enabled;
+            characterController.enabled = false;
+            transform.SetPositionAndRotation(position, rotation);
+            characterController.enabled = controllerWasEnabled;
+            verticalVelocity = 0f;
+        }
     }
 }
-

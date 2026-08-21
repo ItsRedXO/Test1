@@ -57,6 +57,12 @@ namespace ActionRPG.Combat
             OnHealthChanged?.Invoke(CurrentHealth, maxHealth);
         }
 
+        public void RestoreFullHealth()
+        {
+            CurrentHealth = maxHealth;
+            OnHealthChanged?.Invoke(CurrentHealth, maxHealth);
+        }
+
         public void SetMaxHealth(float newMax, bool resetCurrent = true)
         {
             maxHealth = newMax;
