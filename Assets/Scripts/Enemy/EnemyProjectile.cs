@@ -7,6 +7,9 @@ namespace ActionRPG.Enemy
     [RequireComponent(typeof(SphereCollider))]
     public class EnemyProjectile : MonoBehaviour
     {
+        private const float LaunchHeight = 0.75f;
+        private const float AimHeight = 1f;
+
         private Rigidbody body;
         private Collider projectileCollider;
         private GameObject attacker;
@@ -44,6 +47,16 @@ namespace ActionRPG.Enemy
 
             CancelInvoke(nameof(Expire));
             Invoke(nameof(Expire), Mathf.Max(0.01f, lifetime));
+        }
+
+        public static Vector3 GetLaunchPosition(Vector3 originPosition)
+        {
+            return originPosition + Vector3.up * LaunchHeight;
+        }
+
+        public static Vector3 GetAimPoint(Vector3 targetPosition)
+        {
+            return targetPosition + Vector3.up * AimHeight;
         }
 
         public static DamageInfo BuildDamageInfo(GameObject source, float amount, Vector3 knockbackDirection, float hitStun, Vector3 hitPoint)
