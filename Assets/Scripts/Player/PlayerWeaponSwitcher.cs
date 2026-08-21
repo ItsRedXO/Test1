@@ -45,6 +45,14 @@ namespace ActionRPG.Player
             Debug.Log($"[Combat] Switched weapon to: {newWeapon.WeaponName}");
         }
 
+        public bool TryEquipBlockingWeapon()
+        {
+            if (swordAndShieldData == null || !swordAndShieldData.CanBlock || weaponHandler == null) return false;
+
+            SwitchToWeapon(swordAndShieldData);
+            return true;
+        }
+
         public void SetWeaponDataAssets(WeaponData sword, WeaponData shield)
         {
             swordData = sword;

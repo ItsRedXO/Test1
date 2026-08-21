@@ -29,6 +29,8 @@ namespace ActionRPG.Player
         private Health health;
         private PlayerController playerController;
         private PlayerCombatController combatController;
+        private PlayerWeaponSwitcher weaponSwitcher;
+        private bool wasBlockHeld;
         private float regenTimer;
         private Coroutine staggerCoroutine;
 
@@ -37,6 +39,7 @@ namespace ActionRPG.Player
             health = GetComponent<Health>();
             playerController = GetComponent<PlayerController>();
             combatController = GetComponent<PlayerCombatController>();
+            weaponSwitcher = GetComponent<PlayerWeaponSwitcher>();
             if (weaponHandler == null) weaponHandler = GetComponentInChildren<WeaponHandler>();
         }
 
@@ -48,6 +51,7 @@ namespace ActionRPG.Player
 
         private void OnDisable()
         {
+            wasBlockHeld = false;
             if (health != null && health.DamageFilter == ProcessIncomingDamage) health.DamageFilter = null;
             if (weaponHandler != null) weaponHandler.OnWeaponChanged -= HandleWeaponChanged;
         }
@@ -90,6 +94,13 @@ namespace ActionRPG.Player
 
         private void Update()
         {
+            bool wantsBlock = InputHandler.Instance != null && InputHandler.Instance.BlockHeld;
+            if (wantsBlock && !wasBlockHeld)
+            {
+                weaponSwitcher?.TryEquipBlockingWeapon();
+            }
+            wasBlockHeld = wantsBlock;
+
             if (weaponHandler == null || weaponHandler.CurrentWeaponData == null) return;
             WeaponData weaponData = weaponHandler.CurrentWeaponData;
 
@@ -104,7 +115,6 @@ namespace ActionRPG.Player
             }
 
             // Update Block Holding State
-            bool wantsBlock = InputHandler.Instance != null && InputHandler.Instance.BlockHeld;
             bool canBlockNow = wantsBlock && !IsGuardBroken && !IsStaggered && (combatController == null || !combatController.IsAttacking);
 
             if (IsBlocking != canBlockNow)
@@ -163,18 +173,18 @@ namespace ActionRPG.Player
                 return rawDamage;
             }
 
-            // Angle check: Attacker position vs player facing direction
-            if (rawDamage.Attacker != null)
-            {
-                Vector3 directionToAttacker = (rawDamage.Attacker.transform.position - transform.position).normalized;
-                directionToAttacker.y = 0f;
+            // Only attacks with a known horizontal origin can be directionally blocked.
+            if (rawDamage.Attacker == null) return rawDamage;
 
-                float angle = Vector3.Angle(playerController.CurrentFacingDirection, directionToAttacker);
-                if (angle > blockAngle * 0.5f)
-                {
-                    // Hit from side/behind -> Not blocked
-                    return rawDamage;
-                }
+            Vector3 directionToAttacker = rawDamage.Attacker.transform.position - transform.position;
+            directionToAttacker.y = 0f;
+            if (directionToAttacker.sqrMagnitude < 0.0001f) return rawDamage;
+
+            float angle = Vector3.Angle(playerController.CurrentFacingDirection, directionToAttacker);
+            if (angle > blockAngle * 0.5f)
+            {
+                // Hit from side/behind -> Not blocked
+                return rawDamage;
             }
 
             // Block Successful! Reset recovery delay timer whenever taking a blocked hit
@@ -261,4 +271,3 @@ namespace ActionRPG.Player
         }
     }
 }
-
