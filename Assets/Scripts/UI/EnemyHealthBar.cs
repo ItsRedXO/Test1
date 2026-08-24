@@ -4,7 +4,7 @@ using UnityEngine;
 namespace ActionRPG.UI
 {
     /// <summary>
-    /// Simple screen-space enemy health bar driven by the existing Health component.
+    /// Simple screen-space enemy health bar driven directly by the existing Health component.
     /// </summary>
     [RequireComponent(typeof(Health))]
     public class EnemyHealthBar : MonoBehaviour
@@ -21,7 +21,6 @@ namespace ActionRPG.UI
 
         private Health health;
         private UnityEngine.Camera mainCamera;
-        private float healthPercent = 1f;
         private Texture2D borderTexture;
         private Texture2D backgroundTexture;
         private Texture2D fillTexture;
@@ -29,54 +28,22 @@ namespace ActionRPG.UI
         private void Awake()
         {
             health = GetComponent<Health>();
-            healthPercent = health != null && health.MaxHealth > 0f
-                ? health.CurrentHealth / health.MaxHealth
-                : 1f;
             mainCamera = UnityEngine.Camera.main;
             CreateTextures();
         }
 
-        private void OnEnable()
-        {
-            if (health == null) health = GetComponent<Health>();
-            if (health != null)
-            {
-                health.OnHealthChanged += HandleHealthChanged;
-                health.OnDeath += HandleDeath;
-                HandleHealthChanged(health.CurrentHealth, health.MaxHealth);
-            }
-        }
-
-        // EnemyHealthBar can be added automatically while Unity is still finishing
-        // scene initialization. Refresh in Start so all Health.Awake calls have
-        // completed before we cache the initial value.
-        private void Start()
-        {
-            if (health == null) health = GetComponent<Health>();
-            if (health != null)
-            {
-                HandleHealthChanged(health.CurrentHealth, health.MaxHealth);
-            }
-        }
-
-        private void OnDisable()
-        {
-            if (health != null)
-            {
-                health.OnHealthChanged -= HandleHealthChanged;
-                health.OnDeath -= HandleDeath;
-            }
-        }
-
         private void OnGUI()
         {
-            if (health == null || !health.IsAlive) return;
+            if (health == null) health = GetComponent<Health>();
+            if (health == null || !health.IsAlive || health.MaxHealth <= 0f) return;
 
             if (mainCamera == null) mainCamera = UnityEngine.Camera.main;
             if (mainCamera == null) return;
 
             Vector3 screenPosition = mainCamera.WorldToScreenPoint(transform.position + worldOffset);
             if (screenPosition.z <= 0f) return;
+
+            float healthPercent = Mathf.Clamp01(health.CurrentHealth / health.MaxHealth);
 
             float width = barSize.x * 100f;
             float height = barSize.y * 100f;
@@ -97,21 +64,11 @@ namespace ActionRPG.UI
 
             GUI.DrawTexture(innerRect, backgroundTexture);
 
-            float fillWidth = innerRect.width * Mathf.Clamp01(healthPercent);
+            float fillWidth = innerRect.width * healthPercent;
             if (fillWidth > 0f)
             {
                 GUI.DrawTexture(new Rect(innerRect.x, innerRect.y, fillWidth, innerRect.height), fillTexture);
             }
-        }
-
-        private void HandleHealthChanged(float currentHealth, float maxHealth)
-        {
-            healthPercent = maxHealth > 0f ? Mathf.Clamp01(currentHealth / maxHealth) : 0f;
-        }
-
-        private void HandleDeath()
-        {
-            enabled = false;
         }
 
         private void CreateTextures()
