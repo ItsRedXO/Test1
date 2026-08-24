@@ -10,6 +10,11 @@ namespace ActionRPG.Encounters
 
         private bool hasTriggered;
 
+        public void SetManager(EncounterManager manager)
+        {
+            encounterManager = manager;
+        }
+
         private void Reset()
         {
             Collider zoneCollider = GetComponent<Collider>();
@@ -32,10 +37,7 @@ namespace ActionRPG.Encounters
                 return;
             }
 
-            if (encounterManager.TryStartEncounter())
-            {
-                hasTriggered = true;
-            }
+            if (encounterManager.TryStartEncounter()) hasTriggered = true;
         }
     }
 }
