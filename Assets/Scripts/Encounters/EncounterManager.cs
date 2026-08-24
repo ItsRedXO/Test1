@@ -103,38 +103,65 @@ namespace ActionRPG.Encounters
         {
             CurrentState = EncounterState.Starting;
             CurrentWaveIndex = -1;
+            Debug.Log($"[Encounter][Manager] Encounter started with {waves.Length} waves.");
             OnEncounterStarted?.Invoke();
+
             for (int waveIndex = 0; waveIndex < waves.Length; waveIndex++)
             {
                 EncounterWave wave = waves[waveIndex];
                 CurrentWaveIndex = waveIndex;
                 float delay = wave.DelayBeforeWave > 0f ? wave.DelayBeforeWave : (waveIndex > 0 ? delayBetweenWaves : 0f);
-                if (delay > 0f) { CurrentState = EncounterState.BetweenWaves; yield return new WaitForSeconds(delay); }
+                if (delay > 0f)
+                {
+                    CurrentState = EncounterState.BetweenWaves;
+                    yield return new WaitForSeconds(delay);
+                }
+
                 CurrentState = EncounterState.InProgress;
                 SpawnWave(wave);
+                Debug.Log($"[Encounter][Manager] {wave.WaveName} spawned. Alive={aliveEnemies.Count}.");
                 OnWaveStarted?.Invoke(waveIndex, wave);
+
                 while (aliveEnemies.Count > 0) yield return null;
                 OnWaveCompleted?.Invoke(waveIndex, wave);
             }
+
             CurrentState = EncounterState.Completed;
             CurrentWaveIndex = waves.Length;
             encounterCoroutine = null;
+            Debug.Log("[Encounter][Manager] Encounter completed.");
             OnEncounterCompleted?.Invoke();
         }
 
         private void SpawnWave(EncounterWave wave)
         {
             if (wave.SpawnGroups == null) return;
+
             foreach (EnemySpawnGroup group in wave.SpawnGroups)
             {
                 if (group == null || group.EnemyPrefab == null || group.Count <= 0 || group.SpawnPoints == null || group.SpawnPoints.Length == 0) continue;
+
                 for (int i = 0; i < group.Count; i++)
                 {
                     EnemySpawnPoint point = GetValidSpawnPoint(group.SpawnPoints, i);
                     if (point == null) continue;
+
                     GameObject enemyObject = Instantiate(group.EnemyPrefab, point.Position, point.Rotation, spawnedEnemyParent);
+
+                    // Runtime templates are intentionally disabled so the original scene enemies disappear.
+                    // Unity preserves that inactive state on Instantiate, so every spawned clone must be
+                    // explicitly reactivated before it can render, update, or fight.
+                    enemyObject.SetActive(true);
+
                     Health enemyHealth = enemyObject.GetComponent<Health>();
-                    if (enemyHealth != null) TrackEnemy(enemyHealth);
+                    if (enemyHealth != null)
+                    {
+                        TrackEnemy(enemyHealth);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[Encounter][Manager] Spawned {enemyObject.name} but found no Health component, so it cannot be tracked.");
+                    }
                 }
             }
         }
