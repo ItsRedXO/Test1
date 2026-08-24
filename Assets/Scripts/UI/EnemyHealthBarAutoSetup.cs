@@ -12,8 +12,8 @@ namespace ActionRPG.UI
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AddHealthBarsToEnemies()
         {
-            AddHealthBars(FindObjectsByType<EnemyAI>(FindObjectsSortMode.None));
-            AddHealthBars(FindObjectsByType<RangedEnemyAI>(FindObjectsSortMode.None));
+            AddHealthBars(UnityEngine.Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None));
+            AddHealthBars(UnityEngine.Object.FindObjectsByType<RangedEnemyAI>(FindObjectsSortMode.None));
         }
 
         private static void AddHealthBars<T>(T[] enemies) where T : Component
