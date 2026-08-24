@@ -4,8 +4,7 @@ using UnityEngine;
 namespace ActionRPG.UI
 {
     /// <summary>
-    /// Simple world-space enemy health bar. Attach to an enemy and assign a
-    /// child transform above the enemy as the bar position if desired.
+    /// Simple screen-space enemy health bar driven by the existing Health component.
     /// </summary>
     [RequireComponent(typeof(Health))]
     public class EnemyHealthBar : MonoBehaviour
@@ -21,11 +20,8 @@ namespace ActionRPG.UI
         [SerializeField] private float borderThickness = 0.03f;
 
         private Health health;
-        private Camera mainCamera;
+        private UnityEngine.Camera mainCamera;
         private float healthPercent = 1f;
-        private GUIStyle borderStyle;
-        private GUIStyle backgroundStyle;
-        private GUIStyle fillStyle;
         private Texture2D borderTexture;
         private Texture2D backgroundTexture;
         private Texture2D fillTexture;
@@ -36,8 +32,8 @@ namespace ActionRPG.UI
             healthPercent = health != null && health.MaxHealth > 0f
                 ? health.CurrentHealth / health.MaxHealth
                 : 1f;
-            mainCamera = Camera.main;
-            CreateStyles();
+            mainCamera = UnityEngine.Camera.main;
+            CreateTextures();
         }
 
         private void OnEnable()
@@ -64,7 +60,7 @@ namespace ActionRPG.UI
         {
             if (health == null || !health.IsAlive) return;
 
-            if (mainCamera == null) mainCamera = Camera.main;
+            if (mainCamera == null) mainCamera = UnityEngine.Camera.main;
             if (mainCamera == null) return;
 
             Vector3 screenPosition = mainCamera.WorldToScreenPoint(transform.position + worldOffset);
@@ -80,11 +76,12 @@ namespace ActionRPG.UI
 
             GUI.DrawTexture(borderRect, borderTexture);
 
+            float borderPixels = borderThickness * 100f;
             Rect innerRect = new Rect(
-                borderRect.x + borderThickness * 100f,
-                borderRect.y + borderThickness * 100f,
-                Mathf.Max(0f, borderRect.width - borderThickness * 200f),
-                Mathf.Max(0f, borderRect.height - borderThickness * 200f));
+                borderRect.x + borderPixels,
+                borderRect.y + borderPixels,
+                Mathf.Max(0f, borderRect.width - borderPixels * 2f),
+                Mathf.Max(0f, borderRect.height - borderPixels * 2f));
 
             GUI.DrawTexture(innerRect, backgroundTexture);
 
@@ -105,7 +102,7 @@ namespace ActionRPG.UI
             enabled = false;
         }
 
-        private void CreateStyles()
+        private void CreateTextures()
         {
             borderTexture = CreateTexture(borderColor);
             backgroundTexture = CreateTexture(backgroundColor);
