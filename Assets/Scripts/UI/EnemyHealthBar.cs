@@ -47,6 +47,18 @@ namespace ActionRPG.UI
             }
         }
 
+        // EnemyHealthBar can be added automatically while Unity is still finishing
+        // scene initialization. Refresh in Start so all Health.Awake calls have
+        // completed before we cache the initial value.
+        private void Start()
+        {
+            if (health == null) health = GetComponent<Health>();
+            if (health != null)
+            {
+                HandleHealthChanged(health.CurrentHealth, health.MaxHealth);
+            }
+        }
+
         private void OnDisable()
         {
             if (health != null)
