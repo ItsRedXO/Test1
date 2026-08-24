@@ -1,184 +1,70 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using ActionRPG.Combat;
 using UnityEngine;
 
 namespace ActionRPG.Encounters
 {
-    public enum EncounterState { Waiting, Starting, InProgress, BetweenWaves, Completed }
+    public enum EncounterState { Waiting, Active, Cleared }
 
-    [Serializable]
-    public class EnemySpawnGroup
-    {
-        [SerializeField] private GameObject enemyPrefab;
-        [SerializeField] private int count = 1;
-        [SerializeField] private EnemySpawnPoint[] spawnPoints;
-        public GameObject EnemyPrefab => enemyPrefab;
-        public int Count => Mathf.Max(0, count);
-        public EnemySpawnPoint[] SpawnPoints => spawnPoints;
-        public EnemySpawnGroup(GameObject prefab, int amount, EnemySpawnPoint[] points) { enemyPrefab = prefab; count = amount; spawnPoints = points; }
-    }
-
-    [Serializable]
-    public class EncounterWave
-    {
-        [SerializeField] private string waveName = "Wave";
-        [SerializeField] private float delayBeforeWave;
-        [SerializeField] private EnemySpawnGroup[] spawnGroups;
-        public string WaveName => string.IsNullOrWhiteSpace(waveName) ? "Wave" : waveName;
-        public float DelayBeforeWave => Mathf.Max(0f, delayBeforeWave);
-        public EnemySpawnGroup[] SpawnGroups => spawnGroups;
-        public EncounterWave(string name, float delay, EnemySpawnGroup[] groups) { waveName = name; delayBeforeWave = delay; spawnGroups = groups; }
-    }
-
+    /// <summary>
+    /// Tracks one room encounter. Enemies are placed in the scene as part of the level;
+    /// this manager simply activates the encounter and knows when the room is cleared.
+    /// </summary>
     public class EncounterManager : MonoBehaviour
     {
-        [SerializeField] private EncounterWave[] waves;
+        [SerializeField] private Health[] roomEnemies;
         [SerializeField] private bool startAutomatically;
-        [SerializeField] private bool destroySpawnedEnemiesOnDisable = true;
-        [SerializeField] private Transform spawnedEnemyParent;
-        [SerializeField] private float delayBetweenWaves = 1f;
 
         public EncounterState CurrentState { get; private set; } = EncounterState.Waiting;
-        public int CurrentWaveIndex { get; private set; } = -1;
         public int AliveEnemyCount => aliveEnemies.Count;
-        public bool IsEncounterActive => CurrentState == EncounterState.Starting || CurrentState == EncounterState.InProgress || CurrentState == EncounterState.BetweenWaves;
+        public bool IsEncounterActive => CurrentState == EncounterState.Active;
+
         public event Action OnEncounterStarted;
-        public event Action<int, EncounterWave> OnWaveStarted;
-        public event Action<int, EncounterWave> OnWaveCompleted;
-        public event Action OnEncounterCompleted;
+        public event Action OnEncounterCleared;
         public event Action<int> OnAliveEnemyCountChanged;
 
         private readonly List<Health> aliveEnemies = new();
-        private Coroutine encounterCoroutine;
+        private bool configured;
 
-        public void ConfigureRuntime(IReadOnlyList<GameObject> waveOne, IReadOnlyList<GameObject> waveTwo, EnemySpawnPoint[] points)
+        public void ConfigureRuntime(IEnumerable<Health> enemies)
         {
-            spawnedEnemyParent = transform;
-            delayBetweenWaves = 1f;
-            waves = new[]
-            {
-                BuildRuntimeWave("Wave 1", 0f, waveOne, points),
-                BuildRuntimeWave("Wave 2", 1f, waveTwo, points)
-            };
+            roomEnemies = enemies == null ? Array.Empty<Health>() : new List<Health>(enemies).ToArray();
+            configured = true;
         }
 
-        private static EncounterWave BuildRuntimeWave(string name, float delay, IReadOnlyList<GameObject> enemies, EnemySpawnPoint[] points)
+        private void Start()
         {
-            var groups = new List<EnemySpawnGroup>();
-            if (enemies != null)
-            {
-                foreach (GameObject enemy in enemies)
-                {
-                    if (enemy != null) groups.Add(new EnemySpawnGroup(enemy, 1, points));
-                }
-            }
-            return new EncounterWave(name, delay, groups.ToArray());
+            if (!configured) ConfigureRuntime(roomEnemies);
+            if (startAutomatically) TryStartEncounter();
         }
-
-        private void Start() { if (startAutomatically) TryStartEncounter(); }
 
         private void OnDisable()
         {
-            if (encounterCoroutine != null) StopCoroutine(encounterCoroutine);
-            encounterCoroutine = null;
-            foreach (Health enemy in aliveEnemies)
-            {
-                if (enemy != null) enemy.OnDeath -= HandleTrackedEnemyDeath;
-                if (destroySpawnedEnemiesOnDisable && enemy != null) Destroy(enemy.gameObject);
-            }
+            UnsubscribeAll();
             aliveEnemies.Clear();
         }
 
         public bool TryStartEncounter()
         {
-            if (IsEncounterActive || CurrentState == EncounterState.Completed) return false;
-            if (waves == null || waves.Length == 0) return false;
-            encounterCoroutine = StartCoroutine(RunEncounter());
-            return true;
-        }
+            if (CurrentState != EncounterState.Waiting) return false;
+            if (!configured) ConfigureRuntime(roomEnemies);
 
-        private IEnumerator RunEncounter()
-        {
-            CurrentState = EncounterState.Starting;
-            CurrentWaveIndex = -1;
-            Debug.Log($"[Encounter][Manager] Encounter started with {waves.Length} waves.");
+            aliveEnemies.Clear();
+            foreach (Health enemy in roomEnemies)
+            {
+                if (enemy == null || !enemy.IsAlive) continue;
+                aliveEnemies.Add(enemy);
+                enemy.OnDeath += HandleTrackedEnemyDeath;
+            }
+
+            CurrentState = EncounterState.Active;
+            Debug.Log($"[Encounter][Room] Started. Alive enemies={aliveEnemies.Count}.");
             OnEncounterStarted?.Invoke();
-
-            for (int waveIndex = 0; waveIndex < waves.Length; waveIndex++)
-            {
-                EncounterWave wave = waves[waveIndex];
-                CurrentWaveIndex = waveIndex;
-                float delay = wave.DelayBeforeWave > 0f ? wave.DelayBeforeWave : (waveIndex > 0 ? delayBetweenWaves : 0f);
-                if (delay > 0f)
-                {
-                    CurrentState = EncounterState.BetweenWaves;
-                    yield return new WaitForSeconds(delay);
-                }
-
-                CurrentState = EncounterState.InProgress;
-                SpawnWave(wave);
-                Debug.Log($"[Encounter][Manager] {wave.WaveName} spawned. Alive={aliveEnemies.Count}.");
-                OnWaveStarted?.Invoke(waveIndex, wave);
-
-                while (aliveEnemies.Count > 0) yield return null;
-                OnWaveCompleted?.Invoke(waveIndex, wave);
-            }
-
-            CurrentState = EncounterState.Completed;
-            CurrentWaveIndex = waves.Length;
-            encounterCoroutine = null;
-            Debug.Log("[Encounter][Manager] Encounter completed.");
-            OnEncounterCompleted?.Invoke();
-        }
-
-        private void SpawnWave(EncounterWave wave)
-        {
-            if (wave.SpawnGroups == null) return;
-
-            foreach (EnemySpawnGroup group in wave.SpawnGroups)
-            {
-                if (group == null || group.EnemyPrefab == null || group.Count <= 0 || group.SpawnPoints == null || group.SpawnPoints.Length == 0) continue;
-
-                for (int i = 0; i < group.Count; i++)
-                {
-                    EnemySpawnPoint point = GetValidSpawnPoint(group.SpawnPoints, i);
-                    if (point == null) continue;
-
-                    GameObject enemyObject = Instantiate(group.EnemyPrefab, point.Position, point.Rotation, spawnedEnemyParent);
-
-                    // Runtime templates are intentionally disabled so the original scene enemies disappear.
-                    // Unity preserves that inactive state on Instantiate, so every spawned clone must be
-                    // explicitly reactivated before it can render, update, or fight.
-                    enemyObject.SetActive(true);
-
-                    Health enemyHealth = enemyObject.GetComponent<Health>();
-                    if (enemyHealth != null)
-                    {
-                        TrackEnemy(enemyHealth);
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[Encounter][Manager] Spawned {enemyObject.name} but found no Health component, so it cannot be tracked.");
-                    }
-                }
-            }
-        }
-
-        private static EnemySpawnPoint GetValidSpawnPoint(EnemySpawnPoint[] points, int spawnIndex)
-        {
-            var valid = new List<EnemySpawnPoint>();
-            foreach (EnemySpawnPoint point in points) if (point != null) valid.Add(point);
-            return valid.Count == 0 ? null : valid[spawnIndex % valid.Count];
-        }
-
-        private void TrackEnemy(Health enemyHealth)
-        {
-            if (enemyHealth == null || aliveEnemies.Contains(enemyHealth)) return;
-            aliveEnemies.Add(enemyHealth);
-            enemyHealth.OnDeath += HandleTrackedEnemyDeath;
             OnAliveEnemyCountChanged?.Invoke(aliveEnemies.Count);
+
+            if (aliveEnemies.Count == 0) ClearEncounter();
+            return true;
         }
 
         private void HandleTrackedEnemyDeath()
@@ -192,7 +78,25 @@ namespace ActionRPG.Encounters
                     aliveEnemies.RemoveAt(i);
                 }
             }
+
             OnAliveEnemyCountChanged?.Invoke(aliveEnemies.Count);
+            if (aliveEnemies.Count == 0) ClearEncounter();
+        }
+
+        private void ClearEncounter()
+        {
+            if (CurrentState != EncounterState.Active) return;
+            CurrentState = EncounterState.Cleared;
+            Debug.Log("[Encounter][Room] Cleared.");
+            OnEncounterCleared?.Invoke();
+        }
+
+        private void UnsubscribeAll()
+        {
+            foreach (Health enemy in aliveEnemies)
+            {
+                if (enemy != null) enemy.OnDeath -= HandleTrackedEnemyDeath;
+            }
         }
     }
 }
