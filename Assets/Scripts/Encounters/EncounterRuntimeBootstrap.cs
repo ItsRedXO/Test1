@@ -6,9 +6,8 @@ using UnityEngine;
 namespace ActionRPG.Encounters
 {
     /// <summary>
-    /// Temporary bridge for the current scene format. Builds a room encounter and its exit barrier
-    /// at runtime without modifying the binary Unity scene file. Existing enemies stay where the
-    /// level designer placed them; the barrier opens when the room is cleared.
+    /// Temporary bridge for the current scene format. Builds a room encounter and a reusable
+    /// dungeon-style exit gate at runtime without modifying the Unity scene file.
     /// </summary>
     public sealed class EncounterRuntimeBootstrap : MonoBehaviour
     {
@@ -31,7 +30,6 @@ namespace ActionRPG.Encounters
                 .Distinct()
                 .ToArray();
 
-            Debug.Log($"[Encounter][Bootstrap] Building room encounter from {enemies.Length} scene enemies.");
             if (enemies.Length == 0)
             {
                 Debug.LogWarning("[Encounter][Bootstrap] No trackable scene enemies found.");
@@ -65,36 +63,52 @@ namespace ActionRPG.Encounters
             var zone = new GameObject("EncounterZone");
             zone.transform.SetParent(root.transform);
             zone.transform.position = center;
-
             var box = zone.AddComponent<BoxCollider>();
             box.isTrigger = true;
             box.size = new Vector3(24f, 6f, 24f);
+            zone.AddComponent<EncounterZone>().SetManager(manager);
 
-            var zoneComponent = zone.AddComponent<EncounterZone>();
-            zoneComponent.SetManager(manager);
-
-            CreateExitBarrier(root.transform, manager, center, minX, maxX, maxZ);
-
-            Debug.Log($"[Encounter][Bootstrap] Room ready. Center={center}, Zone={box.size}, Enemies={enemies.Length}.");
+            CreateExitGate(root.transform, manager, center, minX, maxX, maxZ);
+            Debug.Log($"[Encounter][Bootstrap] Room ready with {enemies.Length} enemies and an animated exit gate.");
         }
 
-        private static void CreateExitBarrier(Transform parent, EncounterManager manager, Vector3 center, float minX, float maxX, float maxZ)
+        private static void CreateExitGate(Transform parent, EncounterManager manager, Vector3 center, float minX, float maxX, float maxZ)
         {
-            float width = Mathf.Max(10f, (maxX - minX) + 6f);
-            var barrierRoot = new GameObject("ExitBarrier");
-            barrierRoot.transform.SetParent(parent);
-            barrierRoot.transform.position = new Vector3(center.x, 1.75f, maxZ + 2.5f);
+            float width = Mathf.Clamp(Mathf.Max(5f, (maxX - minX) * 0.5f), 5f, 7f);
+            float height = 4.5f;
+            float thickness = 0.65f;
 
-            var visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            visual.name = "BarrierVisual";
-            visual.transform.SetParent(barrierRoot.transform, false);
-            visual.transform.localScale = new Vector3(width, 3.5f, 0.75f);
+            var gateRoot = new GameObject("ExitGate");
+            gateRoot.transform.SetParent(parent);
+            gateRoot.transform.position = new Vector3(center.x, 0f, maxZ + 2.5f);
 
-            var barrier = barrierRoot.AddComponent<RoomExitBarrier>();
-            barrier.ConfigureRuntime(visual.GetComponent<Collider>(), visual.GetComponent<Renderer>());
-            barrier.Bind(manager);
+            Transform leftPost = CreateCube("LeftPost", gateRoot.transform, new Vector3(-width * 0.5f, height * 0.5f, 0f), new Vector3(0.55f, height, thickness));
+            Transform rightPost = CreateCube("RightPost", gateRoot.transform, new Vector3(width * 0.5f, height * 0.5f, 0f), new Vector3(0.55f, height, thickness));
+            Transform topBeam = CreateCube("TopBeam", gateRoot.transform, new Vector3(0f, height, 0f), new Vector3(width + 0.55f, 0.55f, thickness));
 
-            Debug.Log($"[Encounter][Bootstrap] Exit barrier ready at {barrierRoot.transform.position}, width={width}.");
+            float leafWidth = (width - 0.55f) * 0.5f;
+            Transform leftLeaf = CreateCube("LeftGateLeaf", gateRoot.transform, new Vector3(-leafWidth * 0.5f, height * 0.5f, 0f), new Vector3(leafWidth, height, thickness));
+            Transform rightLeaf = CreateCube("RightGateLeaf", gateRoot.transform, new Vector3(leafWidth * 0.5f, height * 0.5f, 0f), new Vector3(leafWidth, height, thickness));
+
+            var colliders = new[]
+            {
+                leftLeaf.GetComponent<Collider>(),
+                rightLeaf.GetComponent<Collider>()
+            };
+
+            var gate = gateRoot.AddComponent<RoomExitGate>();
+            gate.ConfigureRuntime(leftLeaf, rightLeaf, colliders);
+            gate.Bind(manager);
+        }
+
+        private static Transform CreateCube(string name, Transform parent, Vector3 localPosition, Vector3 localScale)
+        {
+            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = name;
+            cube.transform.SetParent(parent, false);
+            cube.transform.localPosition = localPosition;
+            cube.transform.localScale = localScale;
+            return cube.transform;
         }
     }
 }
