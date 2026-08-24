@@ -1,10 +1,14 @@
+using System;
+using System.Collections.Generic;
 using ActionRPG.Combat;
 using UnityEngine;
 
 namespace ActionRPG.UI
 {
     /// <summary>
-    /// Simple screen-space enemy health bar driven directly by the existing Health component.
+    /// Simple screen-space enemy health bar. It follows the Health component
+    /// that is actually receiving damage, which also handles enemies with
+    /// multiple colliders or nested Health components.
     /// </summary>
     [RequireComponent(typeof(Health))]
     public class EnemyHealthBar : MonoBehaviour
@@ -19,23 +23,119 @@ namespace ActionRPG.UI
         [SerializeField] private Color borderColor = Color.black;
         [SerializeField] private float borderThickness = 0.03f;
 
-        private Health health;
+        private readonly List<Health> healthSources = new List<Health>();
+        private readonly Dictionary<Health, Action<float, float>> healthChangedHandlers = new Dictionary<Health, Action<float, float>>();
+        private readonly Dictionary<Health, Action> deathHandlers = new Dictionary<Health, Action>();
+
+        private Health displayHealth;
         private UnityEngine.Camera mainCamera;
         private Texture2D borderTexture;
         private Texture2D backgroundTexture;
         private Texture2D fillTexture;
+        private bool died;
 
         private void Awake()
         {
-            health = GetComponent<Health>();
             mainCamera = UnityEngine.Camera.main;
             CreateTextures();
         }
 
+        private void OnEnable()
+        {
+            BindHealthSources();
+        }
+
+        private void Start()
+        {
+            if (healthSources.Count == 0)
+            {
+                BindHealthSources();
+            }
+
+            if (displayHealth == null)
+            {
+                displayHealth = GetComponent<Health>();
+            }
+        }
+
+        private void OnDisable()
+        {
+            UnbindHealthSources();
+        }
+
+        private void BindHealthSources()
+        {
+            UnbindHealthSources();
+
+            // Include the enemy root first, then any nested Health components.
+            Health rootHealth = GetComponent<Health>();
+            if (rootHealth != null)
+            {
+                AddHealthSource(rootHealth);
+            }
+
+            foreach (Health health in GetComponentsInChildren<Health>(true))
+            {
+                AddHealthSource(health);
+            }
+
+            if (displayHealth == null && healthSources.Count > 0)
+            {
+                displayHealth = healthSources[0];
+            }
+        }
+
+        private void AddHealthSource(Health source)
+        {
+            if (source == null || healthSources.Contains(source)) return;
+
+            healthSources.Add(source);
+
+            Action<float, float> healthChangedHandler = (current, max) =>
+            {
+                displayHealth = source;
+                died = false;
+            };
+
+            Action deathHandler = () =>
+            {
+                if (displayHealth == source)
+                {
+                    died = true;
+                }
+            };
+
+            healthChangedHandlers[source] = healthChangedHandler;
+            deathHandlers[source] = deathHandler;
+            source.OnHealthChanged += healthChangedHandler;
+            source.OnDeath += deathHandler;
+        }
+
+        private void UnbindHealthSources()
+        {
+            foreach (Health source in healthSources)
+            {
+                if (source == null) continue;
+
+                if (healthChangedHandlers.TryGetValue(source, out Action<float, float> healthChangedHandler))
+                {
+                    source.OnHealthChanged -= healthChangedHandler;
+                }
+
+                if (deathHandlers.TryGetValue(source, out Action deathHandler))
+                {
+                    source.OnDeath -= deathHandler;
+                }
+            }
+
+            healthSources.Clear();
+            healthChangedHandlers.Clear();
+            deathHandlers.Clear();
+        }
+
         private void OnGUI()
         {
-            if (health == null) health = GetComponent<Health>();
-            if (health == null || !health.IsAlive || health.MaxHealth <= 0f) return;
+            if (displayHealth == null || died || !displayHealth.IsAlive || displayHealth.MaxHealth <= 0f) return;
 
             if (mainCamera == null) mainCamera = UnityEngine.Camera.main;
             if (mainCamera == null) return;
@@ -43,7 +143,7 @@ namespace ActionRPG.UI
             Vector3 screenPosition = mainCamera.WorldToScreenPoint(transform.position + worldOffset);
             if (screenPosition.z <= 0f) return;
 
-            float healthPercent = Mathf.Clamp01(health.CurrentHealth / health.MaxHealth);
+            float healthPercent = Mathf.Clamp01(displayHealth.CurrentHealth / displayHealth.MaxHealth);
 
             float width = barSize.x * 100f;
             float height = barSize.y * 100f;
